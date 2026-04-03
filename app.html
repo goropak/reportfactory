@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ReportFactory AI — 보고서 생성</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Noto Sans KR',sans-serif;background:#0f1117;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:56px;background:#161922;border-bottom:1px solid #2a2d3a;flex-shrink:0;}
+.logo{font-size:1.15rem;font-weight:800;color:#fff;}
+.logo span{background:linear-gradient(135deg,#6c5ce7,#a29bfe);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.topbar-actions{display:flex;gap:8px;}
+.topbar-btn{padding:8px 16px;border-radius:8px;border:none;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .2s;}
+.topbar-btn-outline{background:transparent;border:1px solid #3a3d4a;color:#aaa;}
+.topbar-btn-outline:hover{border-color:#6c5ce7;color:#fff;}
+.topbar-btn-primary{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;}
+.topbar-btn-primary:hover{transform:translateY(-1px);}
+.main{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:280px;background:#161922;border-right:1px solid #2a2d3a;padding:20px 16px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;}
+.sidebar-section{margin-bottom:18px;}
+.sidebar-label{font-size:.7rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.chip-group{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{padding:6px 12px;border-radius:20px;background:#1e2130;border:1px solid #2a2d3a;color:#aaa;font-size:.73rem;font-weight:500;cursor:pointer;transition:all .2s;user-select:none;}
+.chip:hover{border-color:#6c5ce7;color:#fff;}
+.chip.active{background:#6c5ce7;border-color:#6c5ce7;color:#fff;}
+.sub-types{margin-top:8px;display:none;}
+.sub-types.show{display:flex;flex-wrap:wrap;gap:6px;}
+.hub-input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #2a2d3a;background:#1e2130;color:#fff;font-size:.73rem;margin-top:6px;}
+.hub-input:focus{outline:none;border-color:#6c5ce7;}
+.hub-hint{font-size:.6rem;color:#555;margin-top:4px;}
+.sidebar-bottom{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:16px;border-top:1px solid #2a2d3a;}
+.btn-gen{width:100%;padding:12px;border-radius:10px;border:none;font-size:.82rem;font-weight:700;cursor:pointer;transition:all .2s;}
+.btn-gen-primary{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;}
+.btn-gen-primary:hover{transform:translateY(-1px);}
+.btn-gen-secondary{background:#1e2130;border:1px solid #2a2d3a;color:#aaa;}
+.btn-gen-secondary:hover{border-color:#6c5ce7;color:#fff;}
+.center{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.step-bar{display:flex;align-items:center;padding:14px 24px;background:#161922;border-bottom:1px solid #2a2d3a;gap:6px;flex-shrink:0;flex-wrap:wrap;}
+.step-item{display:flex;align-items:center;gap:5px;font-size:.72rem;font-weight:600;color:#555;cursor:pointer;transition:color .2s;padding:4px 8px;border-radius:6px;}
+.step-item:hover{color:#888;}
+.step-item.active{color:#a29bfe;background:rgba(108,92,231,0.1);}
+.step-item.done{color:#00b894;}
+.step-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800;background:#1e2130;border:2px solid #2a2d3a;transition:all .2s;}
+.step-item.active .step-num{background:#6c5ce7;border-color:#6c5ce7;color:#fff;}
+.step-item.done .step-num{background:#00b894;border-color:#00b894;color:#fff;}
+.step-arrow{color:#333;font-size:.65rem;}
+.step-panel{flex:1;overflow-y:auto;padding:28px 24px;display:none;}
+.step-panel.active{display:flex;flex-direction:column;}
+.panel-title{font-size:1.2rem;font-weight:800;color:#fff;margin-bottom:6px;}
+.panel-desc{font-size:.85rem;color:#888;margin-bottom:20px;line-height:1.65;}
+.pipeline{display:flex;align-items:center;gap:6px;margin:16px 0;flex-wrap:wrap;}
+.pipe-node{padding:7px 14px;border-radius:8px;font-size:.7rem;font-weight:700;color:#fff;transition:all .3s;}
+.pipe-arrow{color:#555;font-size:.75rem;}
+.pipe-app{background:#6c5ce7;}.pipe-zen{background:#0984e3;}.pipe-nlm{background:#00b894;}.pipe-codia{background:#e17055;}
+.pipe-node.current{box-shadow:0 0 12px rgba(255,255,255,0.3);transform:scale(1.08);}
+.prompt-box{background:#1e2130;border:1px solid #2a2d3a;border-radius:12px;padding:18px;font-size:.8rem;color:#ccc;line-height:1.75;white-space:pre-wrap;margin-bottom:16px;max-height:360px;overflow-y:auto;}
+.paste-area{width:100%;min-height:220px;background:#1e2130;border:2px dashed #2a2d3a;border-radius:12px;padding:18px;font-size:.8rem;color:#ccc;line-height:1.7;resize:vertical;transition:border-color .2s;flex-shrink:0;}
+.paste-area:focus{outline:none;border-color:#6c5ce7;}
+.report-preview{background:#1e2130;border:1px solid #2a2d3a;border-radius:12px;padding:22px;margin-bottom:16px;max-height:400px;overflow-y:auto;flex:1;}
+.report-preview h1,.report-preview h2{color:#fff;margin:14px 0 6px;}
+.report-preview h1{font-size:1.15rem;}
+.report-preview h2{font-size:.95rem;color:#a29bfe;}
+.report-preview p,.report-preview li{font-size:.82rem;color:#ccc;line-height:1.7;}
+.report-preview strong{color:#fff;}
+.report-preview table{width:100%;border-collapse:collapse;margin:10px 0;}
+.report-preview th,.report-preview td{padding:7px 10px;border:1px solid #2a2d3a;font-size:.76rem;text-align:left;}
+.report-preview th{background:#252838;color:#a29bfe;}
+.panel-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;flex-shrink:0;}
+.panel-btn{padding:12px 24px;border-radius:10px;border:none;font-size:.84rem;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:6px;}
+.panel-btn:hover{transform:translateY(-1px);}
+.panel-btn-primary{background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:#fff;}
+.panel-btn-blue{background:linear-gradient(135deg,#0984e3,#74b9ff);color:#fff;}
+.panel-btn-green{background:linear-gradient(135deg,#00b894,#55efc4);color:#fff;}
+.panel-btn-orange{background:linear-gradient(135deg,#e17055,#fab1a0);color:#fff;}
+.panel-btn-outline{background:transparent;border:1px solid #3a3d4a;color:#aaa;}
+.panel-btn-outline:hover{border-color:#6c5ce7;color:#fff;}
+.panel-btn-ghost{background:transparent;color:#888;padding:12px 16px;}
+.panel-btn-ghost:hover{color:#fff;}
+.guide-box{background:#1a1d2e;border:1px solid #2a2d3a;border-radius:12px;padding:18px;margin-bottom:16px;}
+.guide-box h3{font-size:.85rem;font-weight:700;color:#a29bfe;margin-bottom:8px;}
+.guide-box ol{padding-left:18px;}
+.guide-box li{font-size:.78rem;color:#aaa;line-height:1.75;margin-bottom:3px;}
+.guide-box li strong{color:#fff;}
+.guide-box.warn{border-color:#e17055;}
+.guide-box.warn h3{color:#e17055;}
+.status-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:#1a1d2e;border:1px solid #2a2d3a;border-radius:10px;margin-bottom:16px;}
+.status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.status-dot.waiting{background:#fdcb6e;}
+.status-dot.active{background:#00b894;animation:pulse 1.5s infinite;}
+.status-dot.done{background:#00b894;}
+.status-text{font-size:.78rem;color:#aaa;}
+.status-text strong{color:#fff;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.preview-panel{width:320px;background:#161922;border-left:1px solid #2a2d3a;padding:20px 16px;overflow-y:auto;flex-shrink:0;}
+.preview-title{font-size:.75rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
+.preview-slide{background:#1e2130;border:1px solid #2a2d3a;border-radius:10px;padding:14px;margin-bottom:10px;}
+.preview-slide h3{font-size:.82rem;font-weight:700;color:#a29bfe;margin-bottom:6px;}
+.preview-slide p{font-size:.72rem;color:#aaa;line-height:1.55;}
+.preview-empty{text-align:center;padding:50px 16px;color:#444;font-size:.82rem;line-height:1.6;}
+.preview-progress{margin-top:12px;padding:10px 14px;background:#1e2130;border:1px solid #2a2d3a;border-radius:8px;}
+.preview-progress .label{font-size:.68rem;color:#888;margin-bottom:4px;}
+.preview-progress .bar{height:6px;background:#2a2d3a;border-radius:3px;overflow:hidden;}
+.preview-progress .fill{height:100%;background:linear-gradient(90deg,#6c5ce7,#a29bfe);border-radius:3px;transition:width .5s;width:0%;}
+.preview-progress .pct{font-size:.68rem;color:#a29bfe;margin-top:4px;text-align:right;}
+.toast{position:fixed;top:72px;right:24px;padding:14px 24px;border-radius:10px;background:#00b894;color:#fff;font-size:.82rem;font-weight:600;z-index:999;opacity:0;transform:translateY(-10px);transition:all .3s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.warn{background:#e17055;}
+@media(max-width:1100px){.preview-panel{display:none;}}
+@media(max-width:700px){.sidebar{display:none;}}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">ReportFactory <span>AI</span></div>
+  <div class="topbar-actions">
+    <button class="topbar-btn topbar-btn-outline" onclick="location.href='index.html'">← 홈</button>
+    <button class="topbar-btn topbar-btn-primary" id="btn-pdf" style="display:none" onclick="exportPDF()">📥 PDF</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">🏢 기업 스타일</div>
+    <div class="chip-group" data-group="style">
+      <div class="chip" data-value="삼성">삼성</div>
+      <div class="chip" data-value="현대">현대</div>
+      <div class="chip" data-value="SK">SK</div>
+      <div class="chip" data-value="포스코">포스코</div>
+      <div class="chip" data-value="LG">LG</div>
+      <div class="chip" data-value="기재부">기재부</div>
+      <div class="chip" data-value="일반">일반</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">📂 보고서 카테고리</div>
+    <div class="chip-group" data-group="category">
+      <div class="chip" data-value="검토·분석" data-sub="타당성 검토,투자 검토,시장 분석,경쟁사 분석,리스크 분석">검토·분석</div>
+      <div class="chip" data-value="기획·제안" data-sub="사업 기획서,프로젝트 제안서,예산 기획,신규사업 제안">기획·제안</div>
+      <div class="chip" data-value="결과·보고" data-sub="출장 결과,프로젝트 완료,실적 보고,감사 결과">결과·보고</div>
+      <div class="chip" data-value="회의·기록" data-sub="회의록,워크숍 결과,세미나 정리,TF 결과">회의·기록</div>
+      <div class="chip" data-value="정기 보고" data-sub="주간 업무,월간 업무,분기 리뷰,연간 리뷰">정기 보고</div>
+    </div>
+    <div class="sub-types" id="sub-types">
+      <div class="chip-group" data-group="subtype" id="subtype-chips"></div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">👤 보고 대상</div>
+    <div class="chip-group" data-group="target">
+      <div class="chip" data-value="실무선">실무선 (팀장·파트장)</div>
+      <div class="chip" data-value="경영진">경영진 (임원·CEO)</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">📏 분량</div>
+    <div class="chip-group" data-group="volume">
+      <div class="chip" data-value="간결">간결 (1-2p)</div>
+      <div class="chip" data-value="보통">보통 (3-5p)</div>
+      <div class="chip" data-value="상세">상세 (6p+)</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">🗣️ 어투</div>
+    <div class="chip-group" data-group="tone">
+      <div class="chip" data-value="격식체" title="~하였습니다, ~드립니다">격식체 (하였습니다)</div>
+      <div class="chip" data-value="준격식체" title="~했습니다, ~합니다">준격식체 (했습니다)</div>
+      <div class="chip" data-value="개조식" title="~임, ~함, ~완료">개조식 (임/함)</div>
+      <div class="chip" data-value="간결체" title="~이다, ~된다">간결체 (이다/된다)</div>
+      <div class="chip" data-value="영문혼용" title="KPI 달성, On-Track">영문혼용 (비즈니스)</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">📊 시각자료</div>
+    <div class="chip-group" data-group="visual">
+      <div class="chip" data-value="포함">포함 (표·차트)</div>
+      <div class="chip" data-value="미포함">미포함</div>
+    </div>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">🔗 젠스파크 허브 링크</div>
+    <input type="text" class="hub-input" id="hub-url" placeholder="https://www.genspark.ai/hub/xxxxx"/>
+    <div class="hub-hint">저장하면 다음에 자동 입력됩니다</div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <button class="btn-gen btn-gen-primary" onclick="generatePrompt()">📋 프롬프트 생성 & 복사</button>
+    <button class="btn-gen btn-gen-secondary" onclick="openRight('genspark')">🚀 젠스파크 나란히 열기</button>
+  </div>
+
+</aside>
+
+<!-- CENTER -->
+<div class="center">
+
+  <div class="step-bar">
+    <div class="step-item active" id="si-1" onclick="goToStep(1)"><div class="step-num">1</div>프롬프트</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item" id="si-2" onclick="goToStep(2)"><div class="step-num">2</div>AI 인터뷰</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item" id="si-3" onclick="goToStep(3)"><div class="step-num">3</div>슬라이드</div>
+    <div class="step-arrow">→</div>
+    <div class="step-item" id="si-4" onclick="goToStep(4)"><div class="step-num">4</div>PPT 변환</div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div class="step-panel active" id="panel-1">
+    <div class="panel-title">① 프롬프트 생성</div>
+    <div class="panel-desc">좌측에서 설정 선택 → "프롬프트 생성 & 복사" → "젠스파크 나란히 열기" 순서로 진행하세요.</div>
+
+    <div class="pipeline" id="pipeline">
+      <div class="pipe-node pipe-app current">① app.html</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node pipe-zen">② 젠스파크</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node pipe-nlm">③ NotebookLM</div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node pipe-codia">④ Codia AI</div>
+    </div>
+
+    <div class="status-bar" id="status-1">
+      <div class="status-dot waiting"></div>
+      <div class="status-text">설정을 선택하고 프롬프트를 생성해주세요</div>
+    </div>
+
+    <div class="prompt-box" id="prompt-display">← 좌측에서 설정을 선택하고 "프롬프트 생성 & 복사" 버튼을 눌러주세요.</div>
+
+    <div class="guide-box">
+      <h3>💡 진행 순서</h3>
+      <ol>
+        <li>좌측에서 <strong>기업 스타일, 보고서 유형, 보고 대상</strong> 등 선택</li>
+        <li><strong>"프롬프트 생성 & 복사"</strong> 클릭 → 클립보드 복사됨</li>
+        <li><strong>"젠스파크 나란히 열기"</strong> 클릭 → 화면 오른쪽에 젠스파크 열림</li>
+        <li>오른쪽 젠스파크에서 <strong>Claude Opus</strong> 선택 후 프롬프트 붙여넣기</li>
+        <li>AI 질문에 하나씩 답변 → 보고서 완성</li>
+      </ol>
+    </div>
+
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-primary" onclick="goToStep(2)">다음: 결과 붙여넣기 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step-panel" id="panel-2">
+    <div class="panel-title">② AI 인터뷰 결과 붙여넣기</div>
+    <div class="panel-desc">오른쪽 젠스파크에서 완성된 보고서를 복사(⌘+C)한 뒤 아래에 붙여넣으세요.</div>
+
+    <div class="status-bar" id="status-2">
+      <div class="status-dot active"></div>
+      <div class="status-text">오른쪽 <strong>젠스파크</strong>에서 AI 인터뷰 진행 중 → 완료되면 결과를 복사하세요</div>
+    </div>
+
+    <textarea class="paste-area" id="paste-area" placeholder="젠스파크에서 완성된 보고서 전체를 여기에 붙여넣으세요.
+
+---REPORT_START--- 부터 ---SLIDE_GUIDE_END--- 까지 전체를 복사하면 됩니다.
+
+💡 팁: 오른쪽 젠스파크에서 전체 선택(⌘+A) → 복사(⌘+C) → 여기 클릭 → 붙여넣기(⌘+V)"></textarea>
+
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-primary" onclick="applyReport()">✅ 보고서 적용하기</button>
+      <button class="panel-btn panel-btn-ghost" onclick="goToStep(1)">← 이전</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step-panel" id="panel-3">
+    <div class="panel-title">③ NotebookLM — 슬라이드 & 인포그래픽</div>
+    <div class="panel-desc">보고서가 적용되었습니다. NotebookLM에서 시각적 슬라이드로 변환하세요.</div>
+
+    <div class="status-bar" id="status-3">
+      <div class="status-dot done"></div>
+      <div class="status-text"><strong>보고서 적용 완료!</strong> 아래 버튼으로 NotebookLM을 열고 슬라이드를 만드세요.</div>
+    </div>
+
+    <div class="report-preview" id="report-preview"></div>
+
+    <div class="guide-box">
+      <h3>📊 NotebookLM 사용법</h3>
+      <ol>
+        <li><strong>"슬라이드 지침 + 보고서 복사"</strong> 클릭 → 지침과 보고서가 함께 복사됩니다</li>
+        <li><strong>"NotebookLM 나란히 열기"</strong> 클릭 → 오른쪽에 열림</li>
+        <li>"새 노트북" 만들기 → <strong>"텍스트 붙여넣기"</strong>로 소스 추가</li>
+        <li>좌측 메뉴에서 <strong>"슬라이드"</strong> 클릭 → 지침에 맞는 슬라이드 생성</li>
+        <li>또는 <strong>"인포그래픽"</strong> 클릭 → 1장 요약 인포그래픽 생성</li>
+        <li>생성된 결과를 <strong>PDF로 다운로드</strong></li>
+      </ol>
+    </div>
+
+    <div class="guide-box warn">
+      <h3>⚠️ NotebookLM PDF는 이미지입니다</h3>
+      <ol>
+        <li>NotebookLM 슬라이드 PDF는 <strong>텍스트가 아닌 이미지</strong>로 저장됩니다</li>
+        <li>Codia AI에서 PPTX 변환 시 <strong>"콘텐츠 수정 가능" 옵션</strong>을 꼭 활성화하세요</li>
+        <li>텍스트 수정이 필요하면 변환된 PPT에서 <strong>텍스트 박스를 직접 추가</strong>하세요</li>
+      </ol>
+    </div>
+
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-primary" onclick="copyReportText()">📋 슬라이드 지침 + 보고서 복사</button>
+      <button class="panel-btn panel-btn-green" onclick="openRight('notebooklm')">📊 NotebookLM 나란히 열기</button>
+      <button class="panel-btn panel-btn-ghost" onclick="goToStep(2)">← 이전</button>
+      <button class="panel-btn panel-btn-primary" onclick="goToStep(4)" style="margin-left:auto;">다음: PPT 변환 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step-panel" id="panel-4">
+    <div class="panel-title">④ Codia AI — 편집 가능한 PPT</div>
+    <div class="panel-desc">NotebookLM에서 다운로드한 PDF를 Codia AI에 업로드하면 편집 가능한 .pptx로 변환됩니다.</div>
+
+    <div class="status-bar" id="status-4">
+      <div class="status-dot active"></div>
+      <div class="status-text">NotebookLM PDF 준비 → <strong>Codia AI</strong>에서 PPTX로 변환하세요</div>
+    </div>
+
+    <div class="guide-box">
+      <h3>🎨 Codia AI 사용법</h3>
+      <ol>
+        <li><strong>"Codia AI 나란히 열기"</strong> 클릭 → 오른쪽에 열림</li>
+        <li>구글/이메일로 로그인</li>
+        <li><strong>"PDF to PPTX"</strong> 또는 <strong>"Design to PPT"</strong> 선택</li>
+        <li>NotebookLM에서 받은 <strong>PDF 파일 업로드</strong></li>
+        <li>출력 형식 <strong>"PowerPoint (PPTX)"</strong> 선택</li>
+        <li><strong>"콘텐츠 수정 가능"</strong> 옵션 활성화</li>
+        <li><strong>"변환"</strong> 클릭 → .pptx 다운로드</li>
+      </ol>
+    </div>
+
+    <div class="guide-box warn">
+      <h3>⚠️ 참고사항</h3>
+      <ol>
+        <li>Codia 무료: <strong>슬라이드 5장</strong>까지 변환 가능</li>
+        <li>5장 초과 시 유료 결제 필요</li>
+        <li>변환 후 <strong>맑은 고딕</strong> 등 기본 폰트로 확인</li>
+      </ol>
+    </div>
+
+    <div class="panel-actions">
+      <button class="panel-btn panel-btn-orange" onclick="openRight('codia')">🎨 Codia AI 나란히 열기</button>
+      <button class="panel-btn panel-btn-ghost" onclick="goToStep(3)">← 이전</button>
+      <button class="panel-btn panel-btn-primary" onclick="resetAll()" style="margin-left:auto;">🔄 처음부터 다시</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- RIGHT PREVIEW -->
+<div class="preview-panel">
+  <div class="preview-title">📄 보고서 미리보기</div>
+  <div id="preview-content">
+    <div class="preview-empty">설정 후 보고서를 생성하면<br/>여기에 미리보기가 표시됩니다.</div>
+  </div>
+  <div class="preview-progress" id="preview-progress" style="display:none;">
+    <div class="label">파이프라인 진행률</div>
+    <div class="bar"><div class="fill" id="progress-fill"></div></div>
+    <div class="pct" id="progress-pct">0%</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+const HUB_KEY='rf_hub_url',REPORT_KEY='rf_report_text';
+let rightWindow=null;
+
+/* 초기화 */
+document.addEventListener('DOMContentLoaded',()=>{
+  const saved=localStorage.getItem(HUB_KEY);
+  if(saved)document.getElementById('hub-url').value=saved;
+  document.getElementById('hub-url').addEventListener('input',e=>{localStorage.setItem(HUB_KEY,e.target.value);});
+  document.querySelectorAll('.chip-group').forEach(group=>{
+    group.addEventListener('click',e=>{
+      const chip=e.target.closest('.chip');
+      if(!chip)return;
+      group.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      if(group.dataset.group==='category'){
+        const subs=chip.dataset.sub;
+        const ct=document.getElementById('sub-types');
+        const ch=document.getElementById('subtype-chips');
+        if(subs){
+          ch.innerHTML=subs.split(',').map(s=>`<div class="chip" data-value="${s.trim()}">${s.trim()}</div>`).join('');
+          ct.classList.add('show');
+          ch.querySelectorAll('.chip').forEach(sc=>{sc.addEventListener('click',()=>{ch.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));sc.classList.add('active');});});
+        }else{ct.classList.remove('show');}
+      }
+    });
+  });
+});
+
+/* 설정 수집 */
+function getVal(g){const el=document.querySelector(`[data-group="${g}"] .chip.active`);return el?el.dataset.value:'';}
+function getSettings(){return{style:getVal('style'),category:getVal('category'),subtype:getVal('subtype'),target:getVal('target'),volume:getVal('volume'),tone:getVal('tone'),visual:getVal('visual')};}
+
+/* 스타일 가이드 */
+function getStyleGuide(s){
+  const g={
+    '삼성':{font:'맑은 고딕',num:'1. 1.1 1.1.1',struct:'개요→현황→분석→결론→건의',emph:'볼드+컬러박스',page:'슬라이드형(PPT)',slide:'삼성 스타일: 진한 남색(#003478) 헤더, 흰 배경, 맑은 고딕, 각 슬라이드 상단에 핵심 메시지 한 줄, 하단에 상세 내용, 데이터는 표와 막대그래프, 번호 1. 1.1 1.1.1, 슬라이드당 포인트 3개 이내'},
+    '현대':{font:'맑은 고딕',num:'1. 1) (1)',struct:'배경→목적→현황→대안→추천안',emph:'볼드+밑줄',page:'문서+슬라이드 혼합',slide:'현대 스타일: 검정+짙은 회색 톤, 좌측 세로 색띠 포인트, 대안 비교 시 좌우 분할, 추천안 강조 박스, 번호 1. 1) (1)'},
+    'SK':{font:'맑은 고딕',num:'1. 가. (1)',struct:'Executive Summary→상세→Action Item',emph:'컬러 강조',page:'슬라이드형',slide:'SK 스타일: 빨간색(#ED1C24) 포인트, 첫 슬라이드 Executive Summary 필수, 마지막 Action Item 표, 핵심 수치 큰 폰트+빨간색, 번호 1. 가. (1)'},
+    '포스코':{font:'맑은 고딕',num:'Ⅰ. 1. 가.',struct:'추진배경→현황→분석→대책→기대효과',emph:'음영+볼드',page:'문서형',slide:'포스코 스타일: 파란색(#00498C) 헤더바, 문서형(텍스트 중심), 음영 박스 강조, 데이터는 표 위주, 번호 Ⅰ. 1. 가., 제목은 내용 요약형'},
+    'LG':{font:'맑은 고딕',num:'1. 1.1 ①',struct:'목적→현황→과제→실행계획→기대성과',emph:'볼드+아이콘',page:'슬라이드형',slide:'LG 스타일: LG 레드(#A50034) 포인트, 깔끔한 여백, 아이콘 활용, 진행 상태 표시(완료/진행중/예정), 실행계획 타임라인, 번호 1. 1.1 ①'},
+    '기재부':{font:'한컴바탕/나눔명조',num:'Ⅰ. 1. 가. (1)',struct:'추진배경→현황→문제점→개선방안→기대효과',emph:'밑줄+음영',page:'문서형(HWP)',slide:'기재부 스타일: 보수적, 감청색 헤더, 명조체, 텍스트 중심, 밑줄+음영 강조, 관계도/조직도 활용, 번호 Ⅰ. 1. 가. (1), 법령 각주 포함'},
+    '일반':{font:'맑은 고딕',num:'1. 1.1 1.1.1',struct:'개요→본론→결론',emph:'볼드',page:'자유',slide:'일반 스타일: 깔끔한 흰 배경, 파란색 포인트, 맑은 고딕, 자유 레이아웃, 번호 1. 1.1 1.1.1'}
+  };
+  return g[s]||g['일반'];
+}
+
+/* 어투 가이드 */
+function getToneGuide(tone){
+  const t={
+    '격식체':`[격식체] 가장 정중한 표현\n• "~하였습니다", "~드립니다", "~바입니다"\n• 예: "매출이 전월 대비 12% 증가하였습니다."\n• 예: "검토하여 주시기 바랍니다."\n• 용도: CEO 보고, 공식 문서, 대외 제출용`,
+    '준격식체':`[준격식체] 정중하지만 자연스러운 표현\n• "~했습니다", "~합니다", "~됩니다"\n• 예: "매출이 전월 대비 12% 증가했습니다."\n• 예: "확인이 필요합니다."\n• 용도: 팀 내부 보고, 일반 업무 보고`,
+    '개조식':`[개조식] 명사형 종결, 간결한 나열\n• "~임", "~함", "~완료", "~예정", "~필요"\n• 예: "매출 전월 대비 12% 증가"\n• 예: "추가 예산 확보 필요"\n• 용도: 슬라이드, 요약 보고, 대시보드`,
+    '간결체':`[간결체] 단정적이고 명확한 서술\n• "~이다", "~된다", "~있다"\n• 예: "매출은 전월 대비 12% 증가한 상태이다."\n• 예: "리스크 요인은 다음과 같다."\n• 용도: 분석 보고서, 리서치, 백서`,
+    '영문혼용':`[영문혼용] 비즈니스 영어 표현 혼합\n• 한국어+영문 비즈니스 용어 혼용\n• 예: "Q1 매출 YoY 12% 성장, Target 대비 108% 달성"\n• 예: "Next Step: 파일럿 런칭 후 KPI 모니터링"\n• 용도: 글로벌 기업, 컨설팅, 외국계`
+  };
+  return t[tone]||t['격식체'];
+}
+
+/* 프롬프트 생성 */
+function generatePrompt(){
+  const s=getSettings();
+  if(!s.style||!s.category){showToast('⚠️ 기업 스타일과 보고서 카테고리를 선택해주세요','warn');return;}
+  const sg=getStyleGuide(s.style);
+  const type=s.subtype||s.category;
+  const toneGuide=getToneGuide(s.tone);
+
+  const prompt=`당신은 한국 대기업 보고서 작성 전문가 AI입니다.
+사용자와 1:1 인터뷰를 진행하며 보고서를 작성합니다.
+★ 한 번에 하나의 질문만. 답변은 짧게.
+
+━━━ 보고서 설정 ━━━
+• 기업 스타일: ${s.style}
+• 보고서 유형: ${type}
+• 보고 대상: ${s.target||'미지정'}
+• 분량: ${s.volume||'보통'}
+• 어투: ${s.tone||'격식체'}
+• 시각자료: ${s.visual||'포함'}
+
+━━━ ${s.style} 스타일 가이드 ━━━
+• 폰트: ${sg.font}
+• 번호 체계: ${sg.num}
+• 목차 구조: ${sg.struct}
+• 강조 방식: ${sg.emph}
+• 페이지 스타일: ${sg.page}
+
+━━━ 보고 대상별 톤 ━━━
+${s.target==='경영진'?
+`[경영진] 1~2페이지, 결론 먼저, 핵심 수치만, "~건의드립니다/~판단됩니다"`:
+`[실무선] 3~5페이지, 상세 현황, 일자·수치·담당자, "~진행 중입니다/~예정입니다"`}
+
+━━━ 어투 상세 ━━━
+${toneGuide}
+
+━━━ 진행 규칙 ━━━
+1. 먼저 설정을 요약 확인 (간단히)
+2. "이 보고서의 제목은?" 부터 시작
+3. 이후: 목적 → 핵심 내용 → 수치/데이터 → 결론 방향
+4. ★★★ 매 답변 후 초안을 절대 보여주지 마세요 ★★★
+5. 파일 업로드 시 먼저 분석 → 부족한 정보만 질문
+6. 모든 질문 완료 후 최종 보고서를 한 번에 출력
+
+━━━ 매 답변 후 형식 (이것만 출력!) ━━━
+✅ 반영. [완성도: ___%]
+👉 (다음 질문 하나)
+
+★ 위 2줄만 출력. 초안·요약·설명 금지.
+
+━━━ 최종 출력 (모든 질문 완료 후 한 번만) ━━━
+
+---REPORT_START---
+# [제목]
+**보고 대상:** ${s.target} | **유형:** ${type} | **스타일:** ${s.style}
+
+## ■ ${sg.struct.split('→').join('\n## ■ ')}
+
+---REPORT_END---
+
+---REVIEW_START---
+[오타/띄어쓰기] • (오류) → (수정)
+[표현 추천] • (원래) → (개선)
+[문장 개선] • (원래) → (개선)
+[검수 요약] 오타 _건 | 표현 _건 | 문장 _건 | 품질 __/100
+---REVIEW_END---
+
+---SLIDE_GUIDE_START---
+
+■ 기본 정보
+• 보고서 유형: ${type}
+• 기업 스타일: ${s.style}
+• 보고 대상: ${s.target||'미지정'}
+
+■ 디자인 스타일
+${sg.slide}
+
+■ 슬라이드 구성
+• 목차에 따라 각 항목 1슬라이드
+• 첫 슬라이드: 표지
+• 마지막 슬라이드: 핵심 요약 및 건의
+${s.target==='경영진'?
+`• 총 3~5장, 결론 먼저, 숫자 크게, 차트 우선`:
+`• 총 5~10장, 상세 현황, 표 활용, Action Item 포함`}
+
+■ 시각자료
+${s.visual==='포함'?
+`• 데이터→표/차트, 비교→분할/비교표, 프로세스→흐름도, 일정→타임라인`:
+`• 텍스트 중심, 필요 시 간단한 표만`}
+
+■ 인포그래픽 시
+• 1장 요약, 핵심 수치 크게, 아이콘 구분
+
+위 보고서를 이 지침에 따라 슬라이드/인포그래픽으로 만들어주세요.
+
+---SLIDE_GUIDE_END---
+
+지금 첫 번째 질문을 시작하세요.`;
+
+  document.getElementById('prompt-display').textContent=prompt;
+  navigator.clipboard.writeText(prompt).then(()=>{
+    showToast('✅ 프롬프트가 클립보드에 복사되었습니다!');
+    document.getElementById('status-1').innerHTML='<div class="status-dot done"></div><div class="status-text"><strong>프롬프트 복사 완료!</strong> 이제 "젠스파크 나란히 열기"를 클릭하세요.</div>';
+  });
+}
+
+/* 오른쪽 창 */
+function openRight(service){
+  const urls={genspark:document.getElementById('hub-url').value.trim()||'https://www.genspark.ai',notebooklm:'https://notebooklm.google.com',codia:'https://codia.ai'};
+  const url=urls[service]||urls.genspark;
+  const sw=screen.availWidth,sh=screen.availHeight;
+  window.moveTo(0,0);
+  window.resizeTo(Math.floor(sw/2),sh);
+  if(rightWindow&&!rightWindow.closed){rightWindow.location.href=url;rightWindow.focus();}
+  else{rightWindow=window.open(url,'rightPanel',`left=${Math.floor(sw/2)},top=0,width=${Math.floor(sw/2)},height=${sh}`);}
+  updatePipeline(service);
+  const names={genspark:'젠스파크',notebooklm:'NotebookLM',codia:'Codia AI'};
+  showToast(`✅ ${names[service]}가 오른쪽에 열렸습니다!`);
+}
+
+/* 파이프라인 하이라이트 */
+function updatePipeline(service){
+  document.querySelectorAll('.pipe-node').forEach(n=>n.classList.remove('current'));
+  const map={genspark:1,notebooklm:2,codia:3};
+  const nodes=document.querySelectorAll('.pipe-node');
+  if(nodes[map[service]])nodes[map[service]].classList.add('current');
+}
+
+/* 진행률 */
+function setProgress(pct){
+  document.getElementById('preview-progress').style.display='block';
+  document.getElementById('progress-fill').style.width=pct+'%';
+  document.getElementById('progress-pct').textContent=pct+'%';
+}
+
+/* 보고서 적용 */
+function applyReport(){
+  const raw=document.getElementById('paste-area').value.trim();
+  if(!raw){showToast('⚠️ 보고서를 붙여넣어주세요','warn');return;}
+  localStorage.setItem(REPORT_KEY,raw);
+  let reportText=raw;
+  const m=raw.match(/---REPORT_START---([\s\S]*?)---REPORT_END---/);
+  if(m)reportText=m[1].trim();
+  document.getElementById('report-preview').innerHTML=marked.parse(reportText);
+  updatePreviewSlides(reportText);
+  document.getElementById('btn-pdf').style.display='inline-block';
+  setProgress(50);
+  showToast('✅ 보고서가 적용되었습니다!');
+  goToStep(3);
+}
+
+/* 미리보기 */
+function updatePreviewSlides(text){
+  const ct=document.getElementById('preview-content');
+  const sections=text.split(/^## /m).filter(s=>s.trim());
+  if(!sections.length){ct.innerHTML=`<div class="preview-slide"><p>${text.substring(0,300)}...</p></div>`;return;}
+  ct.innerHTML=sections.map((sec,i)=>{
+    const lines=sec.trim().split('\n');
+    const title=lines[0].replace(/^#+\s*/,'').replace(/^■\s*/,'');
+    const body=lines.slice(1).join('\n').trim().substring(0,180);
+    return`<div class="preview-slide"><h3>${i===0?'📄 ':'📌 '}${title}</h3><p>${body||'(내용)'}</p></div>`;
+  }).join('');
+}
+
+/* 보고서+지침 복사 (NotebookLM용) */
+function copyReportText(){
+  const raw=localStorage.getItem(REPORT_KEY)||document.getElementById('paste-area').value;
+  let reportText=raw;
+  const rm=raw.match(/---REPORT_START---([\s\S]*?)---REPORT_END---/);
+  if(rm)reportText=rm[1].trim();
+  let slideGuide='';
+  const sm=raw.match(/---SLIDE_GUIDE_START---([\s\S]*?)---SLIDE_GUIDE_END---/);
+  if(sm)slideGuide=sm[1].trim();
+  const combined=slideGuide?`${slideGuide}\n\n━━━ 보고서 원문 ━━━\n\n${reportText}`:reportText;
+  navigator.clipboard.writeText(combined).then(()=>{showToast('✅ 슬라이드 지침 + 보고서가 복사되었습니다!');});
+}
+
+/* 스텝 이동 */
+function goToStep(n){
+  document.querySelectorAll('.step-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`panel-${n}`).classList.add('active');
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById(`si-${i}`);
+    el.classList.remove('active','done');
+    if(i<n)el.classList.add('done');
+    if(i===n)el.classList.add('active');
+  }
+  setProgress({1:0,2:25,3:50,4:75}[n]||0);
+}
+
+/* 리셋 */
+function resetAll(){
+  document.querySelectorAll('.chip.active').forEach(c=>c.classList.remove('active'));
+  document.getElementById('sub-types').classList.remove('show');
+  document.getElementById('prompt-display').textContent='← 좌측에서 설정을 선택하고 "프롬프트 생성 & 복사" 버튼을 눌러주세요.';
+  document.getElementById('paste-area').value='';
+  document.getElementById('report-preview').innerHTML='';
+  document.getElementById('preview-content').innerHTML='<div class="preview-empty">설정 후 보고서를 생성하면<br/>여기에 미리보기가 표시됩니다.</div>';
+  document.getElementById('preview-progress').style.display='none';
+  document.getElementById('btn-pdf').style.display='none';
+  document.getElementById('status-1').innerHTML='<div class="status-dot waiting"></div><div class="status-text">설정을 선택하고 프롬프트를 생성해주세요</div>';
+  localStorage.removeItem(REPORT_KEY);
+  goToStep(1);
+  showToast('🔄 초기화되었습니다');
+}
+
+/* PDF */
+function exportPDF(){
+  const el=document.getElementById('report-preview');
+  if(!el||!el.innerHTML.trim()){showToast('⚠️ 먼저 보고서를 적용해주세요','warn');return;}
+  const opt={margin:[10,10,10,10],filename:'report.pdf',image:{type:'jpeg',quality:0.98},html2pdf:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}};
+  const tmp=document.createElement('div');
+  tmp.style.cssText='background:#fff;color:#000;padding:30px;font-family:"Noto Sans KR",sans-serif;line-height:1.8;max-width:800px;';
+  tmp.innerHTML=el.innerHTML;
+  tmp.querySelectorAll('h1,h2').forEach(h=>{h.style.color='#1a1a2e';h.style.marginTop='20px';});
+  tmp.querySelectorAll('p,li').forEach(p=>{p.style.color='#333';p.style.fontSize='11pt';});
+  tmp.querySelectorAll('th').forEach(t=>{t.style.background='#eef2ff';t.style.color='#333';});
+  tmp.querySelectorAll('td,th').forEach(t=>{t.style.border='1px solid #ddd';t.style.padding='6px';});
+  document.body.appendChild(tmp);
+  html2pdf().set(opt).from(tmp).save().then(()=>{document.body.removeChild(tmp);setProgress(100);showToast('✅ PDF 다운로드 완료!');});
+}
+
+/* 토스트 */
+function showToast(msg,type){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(type==='warn'?' warn':'');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+
+</body>
+</html>
