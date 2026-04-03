@@ -115,6 +115,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:#0f1117;color:#e0e0e0;heig
 </head>
 <body>
 
+  <script>
+if(sessionStorage.getItem('rf_auth')!=='true'){window.location.href='login.html';}
+</script>
+
 <div class="toast" id="toast"></div>
 
 <!-- TOPBAR -->
